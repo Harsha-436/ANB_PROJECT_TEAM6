@@ -1,0 +1,36 @@
+CREATE OR REPLACE PROCEDURE TEAM6.CHILDHOOD_ALLERGIES.SP_TEAM6()
+RETURNS VARCHAR(16777216)
+LANGUAGE PYTHON
+RUNTIME_VERSION = '3.8'
+PACKAGES = ('snowflake-snowpark-python')
+HANDLER = 'run'
+EXECUTE AS OWNER
+AS '
+def run(session):
+    data=session.table("TEAM6.CHILDHOOD_ALLERGIES.CHILDHOOD_ALLERGY_DATASET").to_pandas()
+    data["BIRTH_YEAR"]=data["BIRTH_YEAR"].apply(int)
+    data=data.replace({"S0 - Male":"Male","S1 - Female":"Female","R0 - White":"White","R1 - Black":"Black",
+               "R2 - Asian or Pacific Islander":"Asian or Pacific Islander","R3 - Other":"Other","R4 - Unknown":"Unknown",
+               "E0 - Non-Hispanic":"Non-Hispanic","E1 - Hispanic":"Hispanic","P1 - Medicaid":"Medicaid",
+               "P0 - Non-Medicaid":"Non-Medicaid"})
+    data=data.replace("NA",-99)
+    for i in data.columns[7:]:
+        data[i]=data[i].apply(float)
+        data[i]=round(data[i],2)
+    l=[]
+    for i in data.columns[7:]:
+        for j in data[i]:
+            if j<0 and j!=-99:
+                l.append(j)
+    for i in data:
+        for j in l:
+            if j in l:
+                data=data.replace(j,-99)
+    data["AGE_START_YEARS"]=data["AGE_START_YEARS"].apply(int)
+    data["AGE_END_YEARS"]=data["AGE_END_YEARS"].apply(int)
+    data=data.replace(-99,None)
+    data=data.drop(["AGE_END_YEARS","ATOPIC_MARCH_COHORT","FIRST_ASTHMARX","LAST_ASTHMARX","NUM_ASTHMARX"],axis=1)
+    res=session.create_dataframe(data)
+    res.write.mode("overwrite").saveAsTable("TEAM6.MAIN.TRANSFORMED_DS")
+    return "Successfully Created Stored Procedure SP_TEAM6"
+';
